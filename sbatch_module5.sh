@@ -7,8 +7,8 @@
 #SBATCH -t 4:00:00                                                          # time (HH:MM:SS)
 #SBATCH --mail-type=END,FAIL                                                # Get an email when the program completes or fails
 #SBATCH --mail-user=wlodychak.s@northeastern.edu                             # where to send the email
-#SBATCH --out=/courses/BINF6430.202510/students/wlodychak.s/logs/%x_%j.log   # captured stdout
-#SBATCH --error=/courses/BINF6430.202510/students/wlodychak.s/logs/%x_%j.err # captured stdin
+#SBATCH --out=/courses/BINF6430.202510/students/${USER}/logs/%x_%j.log   # captured stdout
+#SBATCH --error=/courses/BINF6430.202510/students/${USER}/logs/%x_%j.err # captured stdin
 
 set -e
 module load OpenJDK/19.0.1
@@ -50,10 +50,12 @@ alias STAR='singularity run -B "/courses:/courses" \
 ################################################################################################
 ### ALIGNMENT PYTHON MODULE ###
 ################################################################################################
-python STAR_alignment.py
+## TODO parsing the sample set and calling index files for genome
+python STAR_alignment.py -c ${SAMPLEMANIFEST} -g ${GENOME_DIR} -t ${SLURM_CPUS_PER_TASK}
 
 ################################################################################################
 ### SAMTOOLS ###
 ################################################################################################
 SAMTOOLS_PATH=/courses/BINF6430.202510/shared/samtools-latest.sif
 alias SAMTOOLS="singularity run ${SAMTOOLS_PATH} samtools"
+## TODO call SAMTOOLS output
