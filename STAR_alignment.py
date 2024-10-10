@@ -9,6 +9,7 @@ import json
 from os.path import isfile
 
 import pandas as pd
+from pysam import fastq
 
 
 def get_args():
@@ -20,12 +21,17 @@ def get_args():
                         '--config',
                         default = '.',
                         required = True,
-                        help = 'Config file contains parameters for UMI pattern and amplicon')
+                        help = 'Config file containing samples to analyze')
     parser.add_argument('-g',
                         '--genome',
                         default = '.',
                         required = True,
                         help = 'Raw Genome file location')
+    parser.add_argument('-o',
+                        '--outdir',
+                        default = '.',
+                        required = True,
+                        help = 'Where to send all files.')
     return parser.parse_args()
 
 
@@ -155,13 +161,11 @@ def worker(sample, indir):
     """
     worker function for multitprocessing algner
     :param sample:
-    :param amplicon:
-    :param pattern:
-    :param amplicon_dict:
     :param indir:
     :return:
     """
-    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = f'{indir}/logs/run.log')
+
+    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = f'{logs}/run.log')
     try:
         logging.info(f'Trimming {sample}')
         trim1, trim2 = trim(sample, indir)
@@ -176,11 +180,8 @@ def worker(sample, indir):
         logging.error(f"Exception occurred: {e}")
 
 
-def get_samples(indir):
-    files = []
+def get_samples(files):
     sample_dict = {}
-    for extension in ('*.fastq.gz', '*.fastq', '*.fq', '*.fq.gz'):
-        files.extend(glob.glob(os.path.join(indir, 'fastq', extension)))
     for file in files:
         file_name = os.path.basename(file)
         sample_name = file_name.split('_R')[0]
@@ -192,21 +193,24 @@ def get_samples(indir):
         elif read_indicator.startswith('2'):
             sample_dict[sample_name]['R2'] = file
 
-    with open(f'{indir}/logs/sample_list.json', 'w', encoding = 'utf-8') as log_file:
-        json.dump(sample_dict, log_file, indent = 4)
     return sample_dict
 
 
 def main():
     args = get_args()
-    sample_manifest = pd.read_csv(args.config)
-    indir = args.input  # in_dir is where the fastq are
-    os.makedirs(f'{indir}/logs/', exist_ok = True)
+    logs = f'{args.outdir}/logs'
+    os.makedirs(logs, exist_ok = True)
     logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = 'logs/run.log')
-    sample_dict = get_samples(indir)  # see what files exist in the indir
-    with open(f'{indir}/logs/sample_list.json', 'w', encoding = 'utf-8') as log_file:
-        json.dump(sample_dict, log_file, indent = 4)
 
+    # dump the sample files and locations into json
+    with open (args.config, 'r') as f:
+        fastqs = f.readlines().strip()
+    samples = get_samples(fastqs)
+
+    with open(f'{logs}/sample_list.json', 'w', encoding = 'utf-8') as log_file:
+        json.dump(samples, log_file, indent = 4)
+
+    # mp worker asignment
     with multiprocessing.Pool(processes = multiprocessing.cpu_count()) as pool:
         results = []
         for index, row in sample_manifest.iterrows():
