@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=${USER}_alignment                                            # Name of the job
+#SBATCH --job-name=${SLURM_JOB_USER}_alignment                                            # Name of the job
 #SBATCH --partition=courses                                                  # the account used for computational work
 #SBATCH -N 1                                                                # number of nodes
 #SBATCH -c 8                                                                # number of cpus-per-task (threads)
 #SBATCH --mem 32G                                                           # memory pool for all cores
 #SBATCH -t 4:00:00                                                          # time (HH:MM:SS)
 #SBATCH --mail-type=END,FAIL                                                # Get an email when the program completes or fails
-#SBATCH --mail-user=${USER}@northeastern.edu                             # where to send the email
-#SBATCH --out=/courses/BINF6430.202510/students/${USER}/logs/%x_%j.log   # captured stdout
-#SBATCH --error=/courses/BINF6430.202510/students/${USER}/logs/%x_%j.err # captured stdin
+#SBATCH --mail-user=${SLURM_JOB_USER}@northeastern.edu                             # where to send the email
+#SBATCH --out=/courses/BINF6430.202510/students/${SLURM_JOB_USER}/logs/%x_%j.log   # captured stdout
+#SBATCH --error=/courses/BINF6430.202510/students/${SLURM_JOB_USER}/logs/%x_%j.err # captured stdin
 
 set -e
 module load OpenJDK/19.0.1
