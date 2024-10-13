@@ -2,34 +2,23 @@ import argparse
 import subprocess
 import multiprocessing
 import os
-import glob
 import logging
 import time
 import json
-from os.path import isfile
-
-import pandas as pd
-from pysam import fastq
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i',
-                        '--input',
-                        required = True)
     parser.add_argument('-c',
                         '--config',
-                        default = '.',
                         required = True,
                         help = 'Config file containing samples to analyze')
     parser.add_argument('-g',
                         '--genome',
-                        default = '.',
                         required = True,
                         help = 'Raw Genome file location')
     parser.add_argument('-o',
                         '--outdir',
-                        default = '.',
                         required = True,
                         help = 'Where to send all files.')
     return parser.parse_args()
@@ -43,30 +32,30 @@ def run_command(command):
     subprocess.run(command, shell = True, check = True, stdout = subprocess.PIPE)
 
 
-def fastqc(fq1, indir):
+def fastqc(fq1, outdir):
     """
     Generate fastqc files
-    :param fq1:
+    :param fq1: full path for fastq file
+    :param outdir: where you want the fastqc files to go
     :return: .html and .zip of fastq
     """
-    outdir = f'{indir}/results/fastqc'
-    infile = f'{indir}/fastq/{fq1}'
+    outdir = f'{outdir}/fastqc'
     os.makedirs(outdir, exist_ok = True)
     try:
-        run_command(f'fastqc {infile} --outdir {outdir}')
+        run_command(f'fastqc {fq1} --outdir {outdir}')
     except FileNotFoundError as e:
         logging.error(f"An error occurred: {e}")
         raise
 
 
-def multiqc(indir, outdir):
+def multiqc(outdir):
     """
     Generate multiqc files
-    :param indir: fastqc indir location
+    :param outdir: results location
     :return: .html and .zip of fastq
     """
-    outdir = f'{indir}/results/multiqc'
-    fastqc_indir = f'{indir}/results/fasqc'
+    outdir = f'{outdir}/multiqc'
+    fastqc_indir = f'{outdir}/fastqc'
     os.makedirs(outdir, exist_ok = True)
     try:
         run_command(f'multiqc --outdir {outdir} {fastqc_indir}')
@@ -75,35 +64,30 @@ def multiqc(indir, outdir):
         raise
 
 
-def trim(sample, indir):
+def trim(sample_id, read1, read2, outdir):
     """
     Standard adapter trimming function
-    :param sample: sample basename
+    :param sample_id: sample basename
+    :param read1: full path to read 1
+    :param read2: full path to read 2
+    :param outdir: where the trimmed fastq files will go
     :return: trimmed samples for R1 and R2
     """
-    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = 'logs/trimming.log')
-    inraw = f'{indir}/fastq'
-    outtrim = f'{indir}/trimmed'
+    outtrim = f'{outdir}/trimmed'
     trim_ext1 = "_R1.trimmed.fastq"
     trim_ext2 = "_R2.trimmed.fastq"
-
-    raw1 = glob.glob(os.path.join(inraw, sample + "*_R1*"))[0]
-    raw2 = glob.glob(os.path.join(inraw, sample + "*_R2*"))[0]
-    trim1 = os.path.join(outtrim, sample + trim_ext1)
-    trim2 = os.path.join(outtrim, sample + trim_ext2)
+    trim1 = os.path.join(outtrim, sample_id + trim_ext1)
+    trim2 = os.path.join(outtrim, sample_id + trim_ext2)
 
     os.makedirs(outtrim, exist_ok = True)
 
-    print(raw1)
-    print(raw2)
-
-    assert raw1 is not None and raw2 is not None, \
-        (logging.error(f"Read 1 is {raw1}\n")) and logging.error(f"Read 2 is {raw2}\n")
+    assert read1 is not None and read2 is not None, \
+        (logging.error(f"Read 1 is {read1}\n")) and logging.error(f"Read 2 is {read2}\n")
 
     try:
-        logging.info(f"Trimming {sample}")
+        logging.info(f"Trimming {sample_id}")
         command = (f"trimmomatic PE \
-                    {raw1} {raw2} \
+                    {read1} {read2} \
                     {trim1} {trim2} \
                     SLIDINGWINDOW:4:20 MINLEN:25 ILLUMINACLIP:NexteraPE-PE.fa:2:40:15")
         run_command(command)
@@ -114,73 +98,96 @@ def trim(sample, indir):
     return trim1, trim2
 
 
-def align_STAR(genome, fq1, fq2, outdir, aligner):
+def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
     """
-    build a genomic index for any genome
-    :param genome: indexed genome of interest
+    align RNA-seq reads using STAR or HISAT
+    :param sample_id: basename for sample
+    :param genome: path to indexed genome of interest
     :param fq1: trimmed RNASeq read1
     :param fq2: trimmed RNASeq read2
     :param outdir: where do you want the alignment files to go?
     :param aligner: type of aligner to use
-    :return: index build assignment location.
     """
-    assert isfile(genome) and isfile(fq1) and isfile(fq2), f"Genome, fq1 or fq2 does not exist"
-    index = os.path.basename(genome)
-    sample_id = os.path.basename(fq1)
-    if aligner == "STAR":
-        try:
-            logging.info(f"STAR alignment for {fq1} {fq2}")
+    assert os.path.isfile(genome) and os.path.isfile(fq1) and os.path.isfile(fq2), \
+        f"Genome, fq1 or fq2 does not exist"
+
+    try:
+        if aligner == "STAR":
             command = (f"STAR --genomeDir {genome} \
-                            --runThreadN {SBATCH_cores} \
-                            --readFilesIn {fq1} {fq2} \
-                            --outFileNamePrefix {sample_id} \
-                            --outSAMtype BAM SortedByCoordinate \
-                            --outSAMunmapped Within \
-                            --outSAMattributes Standard ")
-
-        except Exception as e:
-            logging.error(f"An error occurred: {e}")
-            raise
-
-    elif aligner == "HiSAT":
-        try:
-            logging.info(f"HiSAT alignment for {fq1} {fq2}")
+                              --runThreadN {multiprocessing.cpu_count()} \
+                              --readFilesIn {fq1} {fq2} \
+                              --outFileNamePrefix {outdir}/alignment_star/{sample_id} \
+                              --outSAMtype BAM SortedByCoordinate \
+                              --outSAMunmapped Within \
+                              --outSAMattributes Standard")
+            run_command(command)
+        elif aligner == "HiSAT":
             command = (f"hisat2 -f -x {genome} \
-                        -1 {fq1} \
-                        -2 {fq2} \
-                        -S {sample_id}.sam ")
+                                   -1 {fq1} \
+                                   -2 {fq2} \
+                                   -S {outdir}/alignment_hisat/{sample_id}.sam ")
+            run_command(command)
+        else:
+            logging.error(f"Unknown aligner {aligner}")
+    except Exception as e:
+        logging.error(f"An error occurred during alignment: {e}")
 
-        except Exception as e:
-            logging.error(f"An error occurred: {e}")
-            raise
-    else:
-        logging.error(f"Unknown aligner {aligner}")
 
-
-def worker(sample, indir):
+def worker(sample_id, read1, read2, outdir):
     """
-    worker function for multitprocessing algner
-    :param sample:
-    :param indir:
+    worker function for multiprocessing aligner
+    :param sample_id: base name sample id
+    :param read1: read1 path location
+    :param read2: read2 path location
+    :param outdir: where do you want to save the output files?
     :return:
     """
 
-    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = f'{logs}/run.log')
-    try:
-        logging.info(f'Trimming {sample}')
-        trim1, trim2 = trim(sample, indir)
-        time.sleep(5)
-        logging.info(f'Removing preprocessing files')
-        remove_files = (trim1, trim2)
-        for file in remove_files:
-            logging.info(f'Removing {file}')
-            os.remove(file)
+    genome = get_args().genome
 
+    # fastqc block
+    try:
+        logging.info(f'FASTQC {sample_id}')
+        fastqc(read1, outdir)
+        fastqc(read2, outdir)
+        time.sleep(5)
     except Exception as e:
-        logging.error(f"Exception occurred: {e}")
+        logging.error(f"Exception occurred during FASTQC: {e}")
+
+    # trimming block
+    try:
+        logging.info(f'Trimming {sample_id}')
+        trim1, trim2 = trim(sample_id, read1, read2, outdir)
+        time.sleep(5)
+    except Exception as e:
+        logging.error(f"Exception occurred during TRIM: {e}")
+
+    # alignment block
+    try:
+        logging.info(f'Aligning {sample_id}')
+        align_reads(genome, sample_id, trim1, trim2, aligner = "STAR", outdir = outdir)
+    except Exception as e:
+        logging.error(f"Exception occurred during STAR: {e}")
+
+    try:
+        logging.info(f'Aligning {sample_id}')
+        align_reads(genome, sample_id, trim1, trim2, aligner = "HiSAT", outdir = outdir)
+    except Exception as e:
+        logging.error(f"Exception occurred during HiSAT: {e}")
+
+    logging.info(f'Removing preprocessing files')
+    remove_files = (trim1, trim2)
+    for file in remove_files:
+        logging.info(f'Removing {file}')
+        os.remove(file)
 
 
 def get_samples(files):
+    """
+    pairs up r1 and r2 samples from a sample manifest into a dict
+    :param files: list of file locations
+    :return: dict of sample R1 and R2 locations
+    """
     sample_dict = {}
     for file in files:
         file_name = os.path.basename(file)
@@ -197,29 +204,48 @@ def get_samples(files):
 
 
 def main():
+    # environ variables
+    cpus = int(os.environ.get('SLURM_CPUS_PER_TASK',
+                              multiprocessing.cpu_count()))
+    job_id = os.environ.get('SLURM_JOB_ID', 'default_value')
     args = get_args()
+
+    # logging assignment
+    outdir = args.outdir
+    os.makedirs(outdir, exist_ok = True)
     logs = f'{args.outdir}/logs'
     os.makedirs(logs, exist_ok = True)
-    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = 'logs/run.log')
+    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = f'{logs}/{job_id}_run.log')
 
     # dump the sample files and locations into json
-    with open (args.config, 'r') as f:
-        fastqs = f.readlines().strip()
-    samples = get_samples(fastqs)
+    with open(args.config, 'r', encoding = 'utf-8') as f:
+        fqs = f.readlines().strip()
+
+    samples = get_samples(fqs)
 
     with open(f'{logs}/sample_list.json', 'w', encoding = 'utf-8') as log_file:
         json.dump(samples, log_file, indent = 4)
 
-    # mp worker asignment
-    with multiprocessing.Pool(processes = multiprocessing.cpu_count()) as pool:
+    # mp worker assignment
+    logging.info(f'Assigning workers for job {job_id}.')
+    logging.info(f'Running on {cpus} cores.')
+    logging.info(f'Samples accounted for - {len(fqs.keys())}.')
+    with multiprocessing.Pool(processes = cpus) as pool:
         results = []
-        for index, row in sample_manifest.iterrows():
-            sample = row['Sample_ID']
-            results.append(pool.apply_async(worker, args = (sample, indir)))
+        for sample_id, paths in samples.items():
+            read1 = paths['R1']
+            read2 = paths['R2']
+            assert os.path.exists(read1), f'{read1} does not exist'  # ensure the files exist
+            assert os.path.exists(read2), f'{read2} does not exist'
+            results.append(pool.apply_async(worker,
+                                            args = (sample_id, read1, read2, outdir)))
 
-        # Wait for all processes to finish
+        # wait for all processes to finish
         for result in results:
             result.get()
+
+    # final quality assessment
+    multiqc(outdir)
 
 
 if __name__ == "__main__":
