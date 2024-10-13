@@ -125,12 +125,39 @@ def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
             command = (f"hisat2 -f -x {genome} \
                                    -1 {fq1} \
                                    -2 {fq2} \
-                                   -S {outdir}/alignment_hisat/{sample_id}.sam ")
+                                   -S {outdir}/alignment_hisat/{sample_id}.sam")
             run_command(command)
         else:
             logging.error(f"Unknown aligner {aligner}")
     except Exception as e:
         logging.error(f"An error occurred during alignment: {e}")
+
+
+def samtools_alignment(sample_id, alignment, outdir, aligner):
+    """
+    Runs samtools - based on different outputs for the rna-seq alignment, we run different commands
+    :param sample_id: basename of the sample
+    :param alignment: BAM or SAM file, depending on the output of the aligner
+    :param outdir: where do the final files go?
+    :param aligner: aligner that was used in the RNA-seq alignment
+    :return:
+    """
+    try:
+        if aligner == "hisat2":
+            command = f"samtools view -bS {alignment} | samtools sort -o {outdir}/alignment_hisat/{sample_id}.sorted.bam"
+            run_command(command)
+            alignment = f"{outdir}/{sample_id}.sorted.bam"
+        elif aligner == "STAR":
+            pass
+
+        command = f"samtools index {alignment}"
+        run_command(command)
+        command = f"samtools flagstat -O tsv {alignment} > {outdir}/{sample_id}.stats.tsv"
+        run_command(command)
+        logging.info(f"Alignment complete {sample_id}")
+
+    except Exception as e:
+        logging.error(f"Samtools alignment error: {e}")
 
 
 def worker(sample_id, read1, read2, outdir):
@@ -164,14 +191,32 @@ def worker(sample_id, read1, read2, outdir):
 
     # alignment block
     try:
-        logging.info(f'Aligning {sample_id}')
+        logging.info(f'Aligning STAR - {sample_id}')
         align_reads(genome, sample_id, trim1, trim2, aligner = "STAR", outdir = outdir)
     except Exception as e:
         logging.error(f"Exception occurred during STAR: {e}")
 
     try:
-        logging.info(f'Aligning {sample_id}')
+        logging.info(f'Aligning HiSAT - {sample_id}')
         align_reads(genome, sample_id, trim1, trim2, aligner = "HiSAT", outdir = outdir)
+    except Exception as e:
+        logging.error(f"Exception occurred during HiSAT: {e}")
+
+    try:
+        logging.info(f'Samtools {sample_id}')
+        samtools_alignment(sample_id,
+                           alignment = f'{outdir}/alignment_star/{sample_id}.bam',
+                           outdir = outdir,
+                           aligner = "STAR")
+    except Exception as e:
+        logging.error(f"Exception occurred during HiSAT: {e}")
+
+    try:
+        logging.info(f'Samtools {sample_id}')
+        samtools_alignment(sample_id,
+                           alignment = f'{outdir}/alignment_hisat/{sample_id}.sam',
+                           outdir = outdir,
+                           aligner = "HiSAT")
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")
 
