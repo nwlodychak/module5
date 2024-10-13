@@ -25,10 +25,11 @@ export LC_ALL=en_US.UTF-8
 ### HOUSEKEEPING ###
 ################################################################################################
 BASE_DIR=/courses/BINF6430.202510
-DATA_DIR=${BASE_DIR}/shared/gencodeH
+DATA_DIR=${BASE_DIR}/shared/gencode
 REFERENCE_FILE=${DATA_DIR}/GRCh38.primary_assembly.genome.fa
 INDEX=$(basename ${REFERENCE_FILE} .fa)
 RESULTS=${BASE_DIR}/students/${USER}/${SLURM_JOB_ID}_results
+mkdir -p ${RESULTS}
 GENOME_DIR=${BASE_DIR}/students/${USER}/STAR
 SAMPLE_DIR=${BASE_DIR}/data/ReaganData/Reagan_PE85_TakaraPicoV2_HC_CM_10042022
 find "$SAMPLE_DIR" -type f -name "*.gz" > ${RESULTS}/samplemanifest.txt
@@ -45,5 +46,4 @@ bowtie2-build --threads ${SLURM_CPUS_PER_TASK} ${REFERENCE_FILE} ${GENOME_DIR}/$
 ################################################################################################
 ### ALIGNMENT PYTHON MODULE ###
 ################################################################################################
-mkdir -p ${RESULTS}
 python STAR_alignment.py -c ${SAMPLE_MANIFEST} -g ${GENOME_DIR} -o ${RESULTS}
