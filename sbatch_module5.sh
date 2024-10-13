@@ -28,9 +28,9 @@ BASE_DIR=/courses/BINF6430.202510
 DATA_DIR=${BASE_DIR}/shared/gencode
 REFERENCE_FILE=${DATA_DIR}/GRCh38.primary_assembly.genome.fa
 INDEX=$(basename ${REFERENCE_FILE} .fa)
-RESULTS=${BASE_DIR}/students/${USER}/${SLURM_JOB_ID}_results
+RESULTS=${BASE_DIR}/students/${SLURM_JOB_USER}/${SLURM_JOB_ID}_results
 mkdir -p ${RESULTS}
-GENOME_DIR=${BASE_DIR}/students/${USER}/STAR
+GENOME_DIR=${BASE_DIR}/students/${SLURM_JOB_USER}/STAR
 SAMPLE_DIR=${BASE_DIR}/data/ReaganData/Reagan_PE85_TakaraPicoV2_HC_CM_10042022
 find "$SAMPLE_DIR" -type f -name "*.gz" > ${RESULTS}/samplemanifest.txt
 SAMPLE_MANIFEST=${RESULTS}/samplemanifest.txt
