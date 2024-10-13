@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=${1}_alignment                                            # Name of the job
+#SBATCH --job-name=wlodychak.s_alignment                                            # Name of the job
 #SBATCH --partition=courses                                                  # the account used for computational work
 #SBATCH -N 1                                                                # number of nodes
 #SBATCH -c 8                                                                # number of cpus-per-task (threads)
 #SBATCH --mem 32G                                                           # memory pool for all cores
 #SBATCH -t 4:00:00                                                          # time (HH:MM:SS)
 #SBATCH --mail-type=END,FAIL                                                # Get an email when the program completes or fails
-#SBATCH --mail-user=${1}@northeastern.edu                             # where to send the email
-#SBATCH --out=/courses/BINF6430.202510/students/${1}/logs/%x_%j.log   # captured stdout
-#SBATCH --error=/courses/BINF6430.202510/students/${1}/logs/%x_%j.err # captured stdin
+#SBATCH --mail-user=wlodychak.s@northeastern.edu                             # where to send the email
+#SBATCH --out=/courses/BINF6430.202510/students/wlodychak.s/logs/%x_%j.log   # captured stdout
+#SBATCH --error=/courses/BINF6430.202510/students/wlodychak.s/logs/%x_%j.err # captured stdin
 
 echo "Loading Modules"
 set -e
@@ -25,13 +25,14 @@ export LC_ALL=en_US.UTF-8
 ################################################################################################
 ### HOUSEKEEPING ###
 ################################################################################################
+USER=${1}
 BASE_DIR=/courses/BINF6430.202510
 DATA_DIR=${BASE_DIR}/shared/gencode
 REFERENCE_FILE=${DATA_DIR}/GRCh38.primary_assembly.genome.fa
 INDEX=$(basename ${REFERENCE_FILE} .fa)
-RESULTS=${BASE_DIR}/students/${1}/${SLURM_JOB_ID}_results
+RESULTS=${BASE_DIR}/students/${USER}/${SLURM_JOB_ID}_results
 mkdir -p ${RESULTS}
-GENOME_DIR=${BASE_DIR}/students/${1}/STAR
+GENOME_DIR=${BASE_DIR}/students/${USER}/STAR
 SAMPLE_DIR=${BASE_DIR}/data/ReaganData/Reagan_PE85_TakaraPicoV2_HC_CM_10042022
 find "$SAMPLE_DIR" -type f -name "*.gz" > ${RESULTS}/samplemanifest.txt
 SAMPLE_MANIFEST=${RESULTS}/samplemanifest.txt
