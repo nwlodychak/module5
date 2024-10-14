@@ -1,0 +1,190 @@
+---
+title: "mapping_statistics_module5"
+author: "Nick Wlodychak"
+output:
+   html_notebook:
+      toc: true
+      number_sections: true
+      toc_fload: true
+      theme: simplex
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+library(ggplot2)
+library(cowplot)
+library(viridis)
+library(dplyr)
+library(tools)
+```
+## Plotting Functions
+
+The plotting functions create a statistics dataframe and barplot for relevant data including replicates
+```{r plotting_funcs}
+# Helper function to generate statistical values for a variable with grouping
+# x_var is split via grouping and the standard error is calculate.
+create_stat_df <- function(df, x_var, group, value) {
+   df %>%
+      group_by(across(all_of(c(x_var, group)))) %>%
+      summarize(
+         Identifier = paste(!!sym(x_var), !!sym(group), sep = "_"),
+         n_obs      = n(),
+         mean       = mean(!!sym(value), na.rm = TRUE),
+         sd         = sd(!!sym(value), na.rm = TRUE),
+         se         = sd / sqrt(n_obs),
+         .groups    = 'drop'
+      ) %>%
+      distinct() %>%
+      arrange(desc(Identifier))
+}
+
+# This function plots a value on the y-axis with a grouping along the x. The fill_cond will separate the bars for a group on dodge using an identifier.
+# This way the data can be split into 2 separate configurations with parent on X and children as fill
+# The stat_df will be generated with the statdf_func
+
+global_plotting <- function(data, value, x_labels = NULL, y_labels = NULL, x_cond, fill_cond, chart_title, max, stat) {
+
+   # Option to title axes, otherwise use the data title
+   if (is.null(x_labels))
+      x_labels <- paste(x_cond)
+   if (is.null(y_labels))
+      y_labels <- paste(value)
+
+   #Generate a statistics dataframe for the groupings based on fill and x cond
+   stat_df <- create_stat_df(data, x_cond, fill_cond, value)
+   stat_df <- stat_df[order(stat_df$mean, decreasing = TRUE),]
+   write.csv(stat_df, "stat_df.csv")
+   #stat_df <- stat_df %>% top_n(10, stat_df$mean)
+
+   # Bar plot logic
+   p <- stat_df %>%
+      ggplot(aes_string(x    = x_cond,
+                        y    = "mean",
+                        fill = fill_cond)) +
+      geom_bar(position = 'dodge', stat = 'identity') +
+      geom_errorbar(aes_string(x    = x_cond,
+                               ymin = "mean - se",
+                               ymax = "mean + se"),
+                    position = 'dodge', stat = 'identity') +
+      #geom_text(aes(label = paste0("N=", n_obs)),
+      #          size     = 3,
+      #          position = position_dodge(width = 0.9),
+      #          vjust    = -5) +
+      theme_light() +
+      ylim(0, max) +
+      labs(title = chart_title,
+           x     = x_labels,
+           y     = y_labels) +
+      scale_fill_viridis(discrete = TRUE, option = "mako", begin = 0, end = 0.9) +
+      theme(legend.position = "none",
+            text            = element_text(size = 11),
+            axis.text.x     = element_text(angle = 90, hjust = 1))
+
+   # save to working directory with value as title
+   ggsave(paste(value, ".plot.png", sep = ""), plot = p, height = 5, width = 7)
+   return(p)
+}
+```
+## File Parsing
+There are various values that are not in a particularly easy format to work with. `tsv` is relatively easy to parse with R, but the `log` files require more finese so we use regex patterns to extract the values of interest.
+```{r file_parsing}
+log_files <- list.files(path = "logs", pattern = "*.out", full.names = TRUE)
+stat_files <- list.files(path = "logs", pattern = "*.tsv", full.names = TRUE)
+
+extract_metrics <- function(file_path) {
+   # sample id information
+   cells <- strsplit(basename(file_path), "_")[[1]]
+   id <- cells[1]
+
+   # branch for file_ext
+   if(file_ext(file_path) == "out"){
+      # read each file
+      log_lines <- readLines(file_path)
+
+      # extract the metrics of interest
+      splices  <- as.numeric(sub(".*\\|\\s*", "",
+                                                      grep("Number of splices: Annotated \\(sjdb\\)",
+                                                           log_lines, value = TRUE)))
+      unique_percent <- as.numeric(sub("%", "",
+                                                      sub(".*\\|\\s*", "",
+                                                          grep("Uniquely mapped reads %",
+                                                               log_lines, value = TRUE))))
+      multi_map <- as.numeric(sub("%", "",
+                                                      sub(".*\\|\\s*", "",
+                                                          grep("% of reads mapped to multiple loci",
+                                                               log_lines, value = TRUE))))
+      # make a dataframe
+      return(data.frame(
+         File                       = id,
+         NumberOfSplicesAnnotated   = splices,
+         UniquelyMappedReadsPercent = unique_percent,
+         MultiMappedLoci            = multi_map
+      ))
+   } else if (file_ext(file_path) == "tsv") {
+      stats <- read.table(file_path,
+                      header = FALSE,
+                      sep = "\t",
+                      stringsAsFactors = FALSE)
+
+      # get the stat of interest
+      primary_mapped_percent <- stats[stats$V3 == "primary mapped %", "V1"]
+
+      # dataframe for stats
+      return(data.frame(
+        File = id,
+        PrimaryMappedPercent = as.numeric(sub("%", "", primary_mapped_percent))
+      ))
+}
+
+}
+
+results_list <- lapply(log_files, extract_metrics)
+stats_list <- lapply(stat_files, extract_metrics)
+results_df <- do.call(rbind, results_list)
+stats_df <- do.call(rbind, stats_list)
+```
+## Final plots
+Here we generate the final plots for the dataset.
+```{r plotting}
+# splicing annotaions
+p1 <- global_plotting(data = results_df,
+                value = "NumberOfSplicesAnnotated",
+                x_cond = "File",
+                fill_cond = "File",
+                chart_title = "Reagan - Number of Splices Annotated",
+                max = 5000000
+)
+
+# mapping reads percent
+p2 <- global_plotting(data = results_df,
+                value = "UniquelyMappedReadsPercent",
+                x_cond = "File",
+                fill_cond = "File",
+                chart_title = "Reagan - Uniquely mapped reads pct",
+                max = 100
+)
+
+# mapping reads percent
+p3 <- global_plotting(data = results_df,
+                value = "MultiMappedLoci",
+                x_cond = "File",
+                fill_cond = "File",
+                chart_title = "Reagan - Mapping to multiple loci pct",
+                max = 100
+)
+
+p4 <- global_plotting(data = stats_df,
+                value = "PrimaryMappedPercent",
+                x_cond = "File",
+                fill_cond = "File",
+                chart_title = "Reagan - Primary Mapped pct",
+                max = 100
+)
+
+p5 <- cowplot::plot_grid(
+  p1, p2, p3, p4,
+  labels = c('A', 'B', 'C', 'D'),
+  align="hv"
+ )
+
+p5
+```
