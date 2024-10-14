@@ -274,7 +274,7 @@ def main():
     # mp worker assignment
     logging.info(f'Assigning workers for job {job_id}.')
     logging.info(f'Running on {cpus} cores.')
-    logging.info(f'Samples accounted for - {len(fqs.keys())}.')
+    logging.info(f'Samples accounted for - {len(samples.keys())}.')
     with multiprocessing.Pool(processes = cpus) as pool:
         results = []
         for sample_id, paths in samples.items():
