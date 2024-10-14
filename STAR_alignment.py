@@ -117,6 +117,7 @@ def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
 
     try:
         if aligner == "STAR":
+            logging.info(f"Beginning alignment {sample_id}")
             command = (f"STAR --genomeDir {genome} \
                               --runThreadN {multiprocessing.cpu_count()} \
                               --readFilesIn {fq1} {fq2} \
@@ -125,12 +126,15 @@ def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
                               --outSAMunmapped Within \
                               --outSAMattributes Standard")
             run_command(command)
+            logging.info(f"Alignment complete - {sample_id}")
         elif aligner == "HiSAT":
+            logging.info(f"Beginning alignment {sample_id}")
             command = (f"hisat2 -f -x {genome} \
                                    -1 {fq1} \
                                    -2 {fq2} \
                                    -S {outdir}/alignment_hisat/{sample_id}.sam")
             run_command(command)
+            logging.info(f"Alignment complete - {sample_id}")
         else:
             logging.error(f"Unknown aligner {aligner}")
     except Exception as e:
