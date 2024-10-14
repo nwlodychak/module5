@@ -129,10 +129,10 @@ def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
             logging.info(f"Alignment complete - {sample_id}")
         elif aligner == "HiSAT":
             logging.info(f"Beginning alignment {sample_id}")
-            command = (f"hisat2 -f -x {genome} \
-                                   -1 {fq1} \
-                                   -2 {fq2} \
-                                   -S {outdir}/alignment_hisat/{sample_id}.sam")
+            command = (f"hisat2 -x {genome} \
+                                -1 {fq1} \
+                                -2 {fq2} \
+                                -S {outdir}/alignment_hisat/{sample_id}.sam")
             run_command(command)
             logging.info(f"Alignment complete - {sample_id}")
         else:
@@ -218,7 +218,7 @@ def worker(sample_id, read1, read2, outdir):
         logging.info(f'Samtools {sample_id}')
         os.makedirs(f'{outdir}/alignment_star', exist_ok = True)
         samtools_alignment(sample_id,
-                           alignment = f'{outdir}/alignment_star/{sample_id}.bam',
+                           alignment = f'{outdir}/alignment_star/{sample_id}Aligned.sortedByCoord.out.bam',
                            outdir = outdir,
                            aligner = "STAR")
         time.sleep(5)
