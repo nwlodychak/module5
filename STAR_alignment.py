@@ -63,10 +63,11 @@ def trim(sample_id, read1, read2, outdir):
 
     try:
         logging.info(f"Trimming {sample_id}")
-        command = (f"trimmomatic PE -threads {multiprocessing.cpu_count()} {read1} {read2} \
+        command = (f"trimmomatic PE -threads {multiprocessing.cpu_count()} \
+                       {read1} {read2} \
                        {trim1} {utrim1} \
                        {trim2} {utrim2} \
-                       ILLUMINACLIP:adapters / TruSeq3-PE.fa:2:30:10 LEADING:5 TRAILING:5 \
+                       ILLUMINACLIP:TruSeq3-PE.fa:2:30:10 LEADING:5 TRAILING:5 \
                        SLIDINGWINDOW:4:20 MINLEN:25")
         run_command(command)
         logging.info(f"Trimming complete - {trim1}")
