@@ -194,20 +194,22 @@ def worker(sample_id, read1, read2, outdir):
         logging.info(f'Trimming {sample_id}')
         trim1, trim2 = trim(sample_id, read1, read2, outdir)
         time.sleep(5)
+        logging.info(f'Trimming - {trim1}')
+        logging.info(f'Trimming - {trim2}')
     except Exception as e:
         logging.error(f"Exception occurred during TRIM: {e}")
 
     # alignment block
     try:
         logging.info(f'Aligning STAR - {sample_id}')
-        align_reads(genome, sample_id, trim1, trim2, aligner = "STAR", outdir = outdir)
+        align_reads(genome, sample_id, fq1 = trim1, fq2 = trim2, aligner = "STAR", outdir = outdir)
         time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during STAR: {e}")
 
     try:
         logging.info(f'Aligning HiSAT - {sample_id}')
-        align_reads(genome, sample_id, trim1, trim2, aligner = "HiSAT", outdir = outdir)
+        align_reads(genome, sample_id, fq1 = trim1, fq2 = trim2, aligner = "HiSAT", outdir = outdir)
         time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")
@@ -234,11 +236,11 @@ def worker(sample_id, read1, read2, outdir):
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")
 
-    logging.info(f'Removing preprocessing files')
-    remove_files = [trim1, trim2]
-    for file in remove_files:
-        logging.info(f'Removing {file}')
-        os.remove(file)
+    #logging.info(f'Removing preprocessing files')
+    #remove_files = [trim1, trim2]
+    #for file in remove_files:
+    #    logging.info(f'Removing {file}')
+    #    os.remove(file)
 
 
 def get_samples(files):
