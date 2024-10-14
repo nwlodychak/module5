@@ -78,10 +78,14 @@ def trim(sample_id, read1, read2, outdir):
     :return: trimmed samples for R1 and R2
     """
     outtrim = f'{outdir}/trimmed'
-    trim_ext1 = "_R1.trimmed.fastq"
-    trim_ext2 = "_R2.trimmed.fastq"
-    trim1 = os.path.join(outtrim, sample_id + trim_ext1)
-    trim2 = os.path.join(outtrim, sample_id + trim_ext2)
+    trim_p_ext1 = "_R1.paired.fq.gz"
+    trim_p_ext2 = "_R2.paired.fq.gz"
+    trim_u_ext1 = "_R1.unpaired.fq.gz"
+    trim_u_ext2 = "_R2.unpaired.fq.gz"
+    trim1 = os.path.join(outtrim, sample_id + trim_p_ext1)
+    trim2 = os.path.join(outtrim, sample_id + trim_p_ext2)
+    utrim1 = os.path.join(outtrim, sample_id + trim_u_ext1)
+    utrim2 = os.path.join(outtrim, sample_id + trim_u_ext2)
 
     os.makedirs(outtrim, exist_ok = True)
 
@@ -90,10 +94,11 @@ def trim(sample_id, read1, read2, outdir):
 
     try:
         logging.info(f"Trimming {sample_id}")
-        command = (f"trimmomatic PE \
-                    {read1} {read2} \
-                    {trim1} {trim2} \
-                    SLIDINGWINDOW:4:20 MINLEN:25 ILLUMINACLIP:NexteraPE-PE.fa:2:40:15")
+        command = (f"trimmomatic PE -threads {multiprocessing.cpu_count()} {read1} {read2} \
+                       {trim1} {utrim1} \
+                       {trim2} {utrim2} \
+                       ILLUMINACLIP:adapters / TruSeq3-PE.fa:2:30:10 LEADING:5 TRAILING:5 \
+                       SLIDINGWINDOW:4:20 MINLEN:25")
         run_command(command)
         logging.info(f"Trimming complete - {trim1}")
         logging.info(f"Trimming complete - {trim2}")
@@ -138,6 +143,7 @@ def samtools_alignment(sample_id, alignment, outdir):
     :param outdir: where do the final files go?
     :return:
     """
+    os.makedirs(f'{outdir}/stats', exist_ok=True)
     try:
         command = f"samtools index {alignment}"
         run_command(command)
