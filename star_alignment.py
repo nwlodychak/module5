@@ -1,13 +1,27 @@
+"""
+star_alignment.py
+Created on 2024.10.09
+Author: Nick Wlodychak
+This module is used to align sequences to a reference genome genereated with STAR.
+It consists of three major parts - Sample parsing, trimming and alignment.
+When running this script we should produce an alignment for samples in the manifest and a stats file
+for samtools alignment.
+"""
 import argparse
 import subprocess
 import multiprocessing
 import os
+import sys
 import logging
 import time
 import json
 
 
 def get_args():
+    """
+    Parse command line arguments
+    :return: args
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-c',
                         '--config',
@@ -29,12 +43,14 @@ def run_command(command):
     Run a bash command
     :param command:
     """
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command,
+                               shell = True,
+                               stdout = subprocess.PIPE,
+                               stderr = subprocess.PIPE)
     stdout, stderr = process.communicate()
     if process.returncode != 0:
         raise Exception(f"Command failed with error: {stderr.decode().strip()}")
     return stdout.decode().strip()
-
 
 
 def trim(sample_id, read1, read2, outdir):
@@ -46,6 +62,8 @@ def trim(sample_id, read1, read2, outdir):
     :param outdir: where the trimmed fastq files will go
     :return: trimmed samples for R1 and R2
     """
+
+    # trimming variables
     outtrim = f'{outdir}/trimmed'
     trim_p_ext1 = "_R1.paired.fq.gz"
     trim_p_ext2 = "_R2.paired.fq.gz"
@@ -59,21 +77,22 @@ def trim(sample_id, read1, read2, outdir):
     os.makedirs(outtrim, exist_ok = True)
 
     assert read1 is not None and read2 is not None, \
-        (logging.error(f"Read 1 is {read1}\n")) and logging.error(f"Read 2 is {read2}\n")
+        (logging.error('Read 1 is %s\n', read1)) and logging.error('Read 2 is %s\n', read2)
 
+    # trimming main command
     try:
-        logging.info(f"Trimming {sample_id}")
-        command = (f"trimmomatic PE -threads {multiprocessing.cpu_count()} \
+        logging.info('Trimming: %s', sample_id)
+        command = f"trimmomatic PE -threads {multiprocessing.cpu_count()} \
                        {read1} {read2} \
                        {trim1} {utrim1} \
                        {trim2} {utrim2} \
                        ILLUMINACLIP:TruSeq3-PE.fa:2:30:10 LEADING:5 TRAILING:5 \
-                       SLIDINGWINDOW:4:20 MINLEN:25")
+                       SLIDINGWINDOW:4:20 MINLEN:25"
         run_command(command)
-        logging.info(f"Trimming complete - {trim1}")
-        logging.info(f"Trimming complete - {trim2}")
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
+        logging.info('Trimming complete: %s', trim1)
+        logging.info('Trimming complete: %s', trim2)
+    except Exception as error:
+        logging.error('An error occurred: %s', error)
         raise
 
     return trim1, trim2
@@ -89,20 +108,21 @@ def align_reads(genome, sample_id, fq1, fq2, outdir):
     :param outdir: where do you want the alignment files to go?
     """
 
+    # alignment main command
     try:
-        logging.info(f"Beginning alignment {sample_id}")
-        command = (f"STAR --genomeDir {genome} \
+        logging.info('Beginning alignment: %s', sample_id)
+        command = f"STAR --genomeDir {genome} \
                           --readFilesCommand zcat \
                           --runThreadN {multiprocessing.cpu_count()} \
                           --readFilesIn {fq1} {fq2} \
                           --outFileNamePrefix {outdir}/alignment_star/{sample_id} \
                           --outSAMtype BAM SortedByCoordinate \
                           --outSAMunmapped Within \
-                          --outSAMattributes Standard")
+                          --outSAMattributes Standard"
         run_command(command)
-        logging.info(f"Alignment complete - {sample_id}")
-    except Exception as e:
-        logging.error(f"An error occurred during alignment: {e}")
+        logging.info('Alignment complete: %s', sample_id)
+    except Exception as error:
+        logging.error('An error occurred during alignment: %s', error)
 
 
 def samtools_alignment(sample_id, alignment, outdir):
@@ -113,16 +133,18 @@ def samtools_alignment(sample_id, alignment, outdir):
     :param outdir: where do the final files go?
     :return:
     """
-    os.makedirs(f'{outdir}/stats', exist_ok=True)
+    os.makedirs(f'{outdir}/stats', exist_ok = True)
+
+    # samtools main command
     try:
         command = f"samtools index {alignment}"
         run_command(command)
         command = f"samtools flagstat -O tsv {alignment} > {outdir}/stats/{sample_id}.stats.tsv"
         run_command(command)
-        logging.info(f"Alignment complete {sample_id}")
+        logging.info('Alignment complete: %s', sample_id)
 
-    except Exception as e:
-        logging.error(f"Samtools alignment error: {e}")
+    except Exception as error:
+        logging.error('Samtools alignment error: %s', error)
 
 
 def worker(sample_id, read1, read2, outdir):
@@ -136,35 +158,35 @@ def worker(sample_id, read1, read2, outdir):
     """
 
     genome = os.path.normpath(get_args().genome)
-    logging.info(f"Genome at - {genome}")
+    logging.info('Genome at: %s', genome)
 
     try:
-        logging.info(f'Trimming {sample_id}')
+        logging.info('Trimming: %s', sample_id)
         trim1, trim2 = trim(sample_id, read1, read2, outdir)
         time.sleep(5)
-        logging.info(f'Trimming - {trim1}')
-        logging.info(f'Trimming - {trim2}')
-    except Exception as e:
-        logging.error(f"Exception occurred during TRIM: {e}")
+    except Exception as error:
+        logging.error('Exception occurred during TRIM: %s', error)
 
     # alignment block
     try:
-        logging.info(f'Aligning STAR - {sample_id}')
+        logging.info('Aligning STAR: %s', sample_id)
         align_reads(genome, sample_id, fq1 = trim1, fq2 = trim2, outdir = outdir)
         time.sleep(5)
-    except Exception as e:
-        logging.error(f"Exception occurred during STAR: {e}")
+    except Exception as error:
+        logging.error('Exception occurred during STAR: %s', error)
 
     # samtools block
     try:
-        logging.info(f'Samtools {sample_id}')
+        logging.info('Samtools: %s', sample_id)
         os.makedirs(f'{outdir}/alignment_star', exist_ok = True)
         samtools_alignment(sample_id,
-                           alignment = f'{outdir}/alignment_star/{sample_id}Aligned.sortedByCoord.out.bam',
+                           alignment = f'{outdir}/'
+                                       f'alignment_star/'
+                                       f'{sample_id}Aligned.sortedByCoord.out.bam',
                            outdir = outdir)
         time.sleep(5)
-    except Exception as e:
-        logging.error(f"Exception occurred during STAR: {e}")
+    except Exception as error:
+        logging.error('Exception occurred during STAR: %s', error)
 
     # logging.info(f'Removing preprocessing files')
     # remove_files = [trim1, trim2]
@@ -180,6 +202,8 @@ def get_samples(files):
     :return: dict of sample R1 and R2 locations
     """
     sample_dict = {}
+
+    # sample parser from file names
     for file in files:
         file_name = os.path.basename(file)
         sample_name = file_name.split('_R')[0]
@@ -195,6 +219,10 @@ def get_samples(files):
 
 
 def main():
+    """
+    Main function for the script, map to workers set variables
+    :return:
+    """
     # environ variables
     cpus = int(os.environ.get('SLURM_CPUS_PER_TASK',
                               multiprocessing.cpu_count()))
@@ -206,11 +234,15 @@ def main():
     os.makedirs(outdir, exist_ok = True)
     logs = f'{args.outdir}/logs'
     os.makedirs(logs, exist_ok = True)
-    logging.basicConfig(level = logging.INFO, format = '%(message)s', filename = f'{logs}/{job_id}_run.log')
+    logging.basicConfig(handlers = [logging.FileHandler(filename = f'{logs}/{job_id}_run.log',
+                                                        encoding = 'utf-8', ),
+                                    logging.StreamHandler(sys.stdout)],
+                        format = '%(levelname)-8s %(message)s',
+                        level = logging.INFO)
 
     # dump the sample files and locations into json
-    with open(args.config, 'r', encoding = 'utf-8') as f:
-        fqs = [line.strip() for line in f.readlines()]
+    with open(args.config, 'r', encoding = 'utf-8') as file:
+        fqs = [line.strip() for line in file.readlines()]
 
     samples = get_samples(fqs)
 
@@ -218,9 +250,9 @@ def main():
         json.dump(samples, log_file, indent = 4)
 
     # mp worker assignment
-    logging.info(f'Assigning workers for job {job_id}.')
-    logging.info(f'Running on {cpus} cores.')
-    logging.info(f'Samples accounted for - {len(samples.keys())}.')
+    logging.info('Assigning workers for job - %d.', job_id)
+    logging.info('Running on %d cores.', cpus)
+    logging.info('Samples accounted for %d.', len(samples.keys()))
     with multiprocessing.Pool(processes = cpus) as pool:
         results = []
         for sample_id, paths in samples.items():
