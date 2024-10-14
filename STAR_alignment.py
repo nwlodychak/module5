@@ -95,6 +95,8 @@ def trim(sample_id, read1, read2, outdir):
                     {trim1} {trim2} \
                     SLIDINGWINDOW:4:20 MINLEN:25 ILLUMINACLIP:NexteraPE-PE.fa:2:40:15")
         run_command(command)
+        logging.info(f"Trimming complete - {trim1}")
+        logging.info(f"Trimming complete - {trim2}")
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         raise
