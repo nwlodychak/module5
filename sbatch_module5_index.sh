@@ -13,24 +13,10 @@
 echo "Loading Modules"
 set -e
 
-modules=(
-    "OpenJDK/19.0.1"
-    "fastqc"
-    "star/2.7.11a"
-    "anaconda3/2021.11"
-)
-
 # load modules
-for module in "${modules[@]}"; do
-    module load "$module"
-done
-
-source activate BINF-12-2021
+module load "star/2.7.11a"
 export LC_CTYPE=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-
-echo "Modules loaded and environment set up successfully."
-
 
 ################################################################################################
 ### HOUSEKEEPING ###

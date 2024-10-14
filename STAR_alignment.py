@@ -159,16 +159,17 @@ def worker(sample_id, read1, read2, outdir):
     :return:
     """
 
-    genome = get_args().genome
+    genome = os.path.normpath(get_args().genome)
+    logging.info(f"Genome at - {genome}")
 
     # fastqc block
-    try:
-        logging.info(f'FASTQC {sample_id}')
-        fastqc(read1, outdir)
-        fastqc(read2, outdir)
-        time.sleep(5)
-    except Exception as e:
-        logging.error(f"Exception occurred during FASTQC: {e}")
+    # try:
+    #     logging.info(f'FASTQC {sample_id}')
+    #     fastqc(read1, outdir)
+    #     fastqc(read2, outdir)
+    #     time.sleep(5)
+    # except Exception as e:
+    #    logging.error(f"Exception occurred during FASTQC: {e}")
 
     # trimming block
     try:
@@ -183,28 +184,27 @@ def worker(sample_id, read1, read2, outdir):
     # alignment block
     try:
         logging.info(f'Aligning STAR - {sample_id}')
-        align_reads(genome, sample_id, fq1 = trim1, fq2 = trim2, aligner = "STAR", outdir = outdir)
+        align_reads(genome, sample_id, fq1 = trim1, fq2 = trim2, outdir = outdir)
         time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during STAR: {e}")
 
-
+    # samtools block
     try:
         logging.info(f'Samtools {sample_id}')
         os.makedirs(f'{outdir}/alignment_star', exist_ok = True)
         samtools_alignment(sample_id,
                            alignment = f'{outdir}/alignment_star/{sample_id}Aligned.sortedByCoord.out.bam',
-                           outdir = outdir,
-                           aligner = "STAR")
+                           outdir = outdir)
         time.sleep(5)
     except Exception as e:
-        logging.error(f"Exception occurred during HiSAT: {e}")
+        logging.error(f"Exception occurred during STAR: {e}")
 
-    #logging.info(f'Removing preprocessing files')
-    #remove_files = [trim1, trim2]
-    #for file in remove_files:
-    #    logging.info(f'Removing {file}')
-    #    os.remove(file)
+    # logging.info(f'Removing preprocessing files')
+    # remove_files = [trim1, trim2]
+    # for file in remove_files:
+    #     logging.info(f'Removing {file}')
+    #     os.remove(file)
 
 
 def get_samples(files):
@@ -236,7 +236,7 @@ def main():
     args = get_args()
 
     # logging assignment
-    outdir = args.outdir
+    outdir = os.path.normpath(args.outdir)
     os.makedirs(outdir, exist_ok = True)
     logs = f'{args.outdir}/logs'
     os.makedirs(logs, exist_ok = True)

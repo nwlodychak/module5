@@ -17,7 +17,6 @@ modules=(
     "OpenJDK/19.0.1"
     "fastqc"
     "star/2.7.11a"
-    "bowtie/2.5.2"
     "samtools/1.19.2"
     "anaconda3/2021.11"
 )
