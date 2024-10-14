@@ -264,7 +264,7 @@ def main():
 
     # dump the sample files and locations into json
     with open(args.config, 'r', encoding = 'utf-8') as f:
-        fqs = f.readlines().strip()
+        fqs = [line.strip() for line in f.readlines()]
 
     samples = get_samples(fqs)
 
