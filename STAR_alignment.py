@@ -62,7 +62,7 @@ def multiqc(outdir):
     fastqc_indir = f'{outdir}/fastqc'
     os.makedirs(outdir, exist_ok = True)
     try:
-        run_command(f'multiqc --outdir {outdir} {fastqc_indir}')
+        run_command(f'multiqc -O {outdir} {fastqc_indir}')
     except FileNotFoundError as e:
         logging.error(f"An error occurred: {e}")
         raise
@@ -104,7 +104,7 @@ def trim(sample_id, read1, read2, outdir):
     return trim1, trim2
 
 
-def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
+def align_reads(genome, sample_id, fq1, fq2, outdir):
     """
     align RNA-seq reads using STAR or HISAT
     :param sample_id: basename for sample
@@ -112,55 +112,36 @@ def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
     :param fq1: trimmed RNASeq read1
     :param fq2: trimmed RNASeq read2
     :param outdir: where do you want the alignment files to go?
-    :param aligner: type of aligner to use
     """
 
     try:
-        if aligner == "STAR":
-            logging.info(f"Beginning alignment {sample_id}")
-            command = (f"STAR --genomeDir {genome} \
-                              --runThreadN {multiprocessing.cpu_count()} \
-                              --readFilesIn {fq1} {fq2} \
-                              --outFileNamePrefix {outdir}/alignment_star/{sample_id} \
-                              --outSAMtype BAM SortedByCoordinate \
-                              --outSAMunmapped Within \
-                              --outSAMattributes Standard")
-            run_command(command)
-            logging.info(f"Alignment complete - {sample_id}")
-        elif aligner == "HiSAT":
-            logging.info(f"Beginning alignment {sample_id}")
-            command = (f"hisat2 -x {genome} \
-                                -1 {fq1} \
-                                -2 {fq2} \
-                                -S {outdir}/alignment_hisat/{sample_id}.sam")
-            run_command(command)
-            logging.info(f"Alignment complete - {sample_id}")
-        else:
-            logging.error(f"Unknown aligner {aligner}")
+        logging.info(f"Beginning alignment {sample_id}")
+        command = (f"STAR --genomeDir {genome} \
+                          --readFilesCommand zcat \
+                          --runThreadN {multiprocessing.cpu_count()} \
+                          --readFilesIn {fq1} {fq2} \
+                          --outFileNamePrefix {outdir}/alignment_star/{sample_id} \
+                          --outSAMtype BAM SortedByCoordinate \
+                          --outSAMunmapped Within \
+                          --outSAMattributes Standard")
+        run_command(command)
+        logging.info(f"Alignment complete - {sample_id}")
     except Exception as e:
         logging.error(f"An error occurred during alignment: {e}")
 
 
-def samtools_alignment(sample_id, alignment, outdir, aligner):
+def samtools_alignment(sample_id, alignment, outdir):
     """
     Runs samtools - based on different outputs for the rna-seq alignment, we run different commands
     :param sample_id: basename of the sample
     :param alignment: BAM or SAM file, depending on the output of the aligner
     :param outdir: where do the final files go?
-    :param aligner: aligner that was used in the RNA-seq alignment
     :return:
     """
     try:
-        if aligner == "hisat2":
-            command = f"samtools view -bS {alignment} | samtools sort -o {outdir}/alignment_hisat/{sample_id}.sorted.bam"
-            run_command(command)
-            alignment = f"{outdir}/{sample_id}.sorted.bam"
-        elif aligner == "STAR":
-            pass
-
         command = f"samtools index {alignment}"
         run_command(command)
-        command = f"samtools flagstat -O tsv {alignment} > {outdir}/{sample_id}.stats.tsv"
+        command = f"samtools flagstat -O tsv {alignment} > {outdir}/stats/{sample_id}.stats.tsv"
         run_command(command)
         logging.info(f"Alignment complete {sample_id}")
 
@@ -207,12 +188,6 @@ def worker(sample_id, read1, read2, outdir):
     except Exception as e:
         logging.error(f"Exception occurred during STAR: {e}")
 
-    try:
-        logging.info(f'Aligning HiSAT - {sample_id}')
-        align_reads(genome, sample_id, fq1 = trim1, fq2 = trim2, aligner = "HiSAT", outdir = outdir)
-        time.sleep(5)
-    except Exception as e:
-        logging.error(f"Exception occurred during HiSAT: {e}")
 
     try:
         logging.info(f'Samtools {sample_id}')
@@ -221,17 +196,6 @@ def worker(sample_id, read1, read2, outdir):
                            alignment = f'{outdir}/alignment_star/{sample_id}Aligned.sortedByCoord.out.bam',
                            outdir = outdir,
                            aligner = "STAR")
-        time.sleep(5)
-    except Exception as e:
-        logging.error(f"Exception occurred during HiSAT: {e}")
-
-    try:
-        logging.info(f'Samtools {sample_id}')
-        os.makedirs(f'{outdir}/alignment_hisat', exist_ok = True)
-        samtools_alignment(sample_id,
-                           alignment = f'{outdir}/alignment_hisat/{sample_id}.sam',
-                           outdir = outdir,
-                           aligner = "HiSAT")
         time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")

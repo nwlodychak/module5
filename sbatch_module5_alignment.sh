@@ -19,7 +19,6 @@ modules=(
     "star/2.7.11a"
     "bowtie/2.5.2"
     "samtools/1.19.2"
-    "hisat2/2.2.0"
     "anaconda3/2021.11"
 )
 
@@ -31,6 +30,8 @@ done
 source activate BINF-12-2021
 export LC_CTYPE=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+MULTIQC_PATH=/courses/BINF6430.202510/shared/multiqc-latest.sif
+alias MULTIQC="singularity run ${MULTIQC_PATH} multiqc"
 
 echo "Modules loaded and environment set up successfully."
 
@@ -40,12 +41,9 @@ echo "Modules loaded and environment set up successfully."
 ################################################################################################
 USER=${1}
 BASE_DIR=/courses/BINF6430.202510
-DATA_DIR=${BASE_DIR}/shared/gencode
-REFERENCE_FILE=${DATA_DIR}/GRCh38.primary_assembly.genome.fa
-INDEX=$(basename ${REFERENCE_FILE} .fa)
 RESULTS=${BASE_DIR}/students/${USER}/${SLURM_JOB_ID}_results
 mkdir -p ${RESULTS}
-GENOME_DIR=${BASE_DIR}/students/${USER}/STAR
+GENOME_DIR=${BASE_DIR}/students/${USER}/STAR/
 SAMPLE_DIR=${BASE_DIR}/data/ReaganData/Reagan_PE85_TakaraPicoV2_HC_CM_10042022
 find "$SAMPLE_DIR" -type f -name "*.gz" > ${RESULTS}/samplemanifest.txt
 SAMPLE_MANIFEST=${RESULTS}/samplemanifest.txt
