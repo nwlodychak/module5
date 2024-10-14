@@ -29,7 +29,11 @@ def run_command(command):
     Run a bash command
     :param command:
     """
-    subprocess.run(command, shell = True, check = True, stdout = subprocess.PIPE)
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    if process.returncode != 0:
+        raise Exception(f"Command failed with error: {stderr.decode().strip()}")
+    return stdout.decode().strip()
 
 
 def fastqc(fq1, outdir):
@@ -193,35 +197,41 @@ def worker(sample_id, read1, read2, outdir):
     try:
         logging.info(f'Aligning STAR - {sample_id}')
         align_reads(genome, sample_id, trim1, trim2, aligner = "STAR", outdir = outdir)
+        time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during STAR: {e}")
 
     try:
         logging.info(f'Aligning HiSAT - {sample_id}')
         align_reads(genome, sample_id, trim1, trim2, aligner = "HiSAT", outdir = outdir)
+        time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")
 
     try:
         logging.info(f'Samtools {sample_id}')
+        os.makedirs(f'{outdir}/alignment_star', exist_ok = True)
         samtools_alignment(sample_id,
                            alignment = f'{outdir}/alignment_star/{sample_id}.bam',
                            outdir = outdir,
                            aligner = "STAR")
+        time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")
 
     try:
         logging.info(f'Samtools {sample_id}')
+        os.makedirs(f'{outdir}/alignment_hisat', exist_ok = True)
         samtools_alignment(sample_id,
                            alignment = f'{outdir}/alignment_hisat/{sample_id}.sam',
                            outdir = outdir,
                            aligner = "HiSAT")
+        time.sleep(5)
     except Exception as e:
         logging.error(f"Exception occurred during HiSAT: {e}")
 
     logging.info(f'Removing preprocessing files')
-    remove_files = (trim1, trim2)
+    remove_files = [trim1, trim2]
     for file in remove_files:
         logging.info(f'Removing {file}')
         os.remove(file)
