@@ -36,37 +36,6 @@ def run_command(command):
     return stdout.decode().strip()
 
 
-def fastqc(fq1, outdir):
-    """
-    Generate fastqc files
-    :param fq1: full path for fastq file
-    :param outdir: where you want the fastqc files to go
-    :return: .html and .zip of fastq
-    """
-    outdir = f'{outdir}/fastqc'
-    os.makedirs(outdir, exist_ok = True)
-    try:
-        run_command(f'fastqc {fq1} --outdir {outdir}')
-    except FileNotFoundError as e:
-        logging.error(f"An error occurred: {e}")
-        raise
-
-
-def multiqc(outdir):
-    """
-    Generate multiqc files
-    :param outdir: results location
-    :return: .html and .zip of fastq
-    """
-    outdir = f'{outdir}/multiqc'
-    fastqc_indir = f'{outdir}/fastqc'
-    os.makedirs(outdir, exist_ok = True)
-    try:
-        run_command(f'multiqc -O {outdir} {fastqc_indir}')
-    except FileNotFoundError as e:
-        logging.error(f"An error occurred: {e}")
-        raise
-
 
 def trim(sample_id, read1, read2, outdir):
     """
@@ -168,16 +137,6 @@ def worker(sample_id, read1, read2, outdir):
     genome = os.path.normpath(get_args().genome)
     logging.info(f"Genome at - {genome}")
 
-    # fastqc block
-    # try:
-    #     logging.info(f'FASTQC {sample_id}')
-    #     fastqc(read1, outdir)
-    #     fastqc(read2, outdir)
-    #     time.sleep(5)
-    # except Exception as e:
-    #    logging.error(f"Exception occurred during FASTQC: {e}")
-
-    # trimming block
     try:
         logging.info(f'Trimming {sample_id}')
         trim1, trim2 = trim(sample_id, read1, read2, outdir)
@@ -274,9 +233,6 @@ def main():
         # wait for all processes to finish
         for result in results:
             result.get()
-
-    # final quality assessment
-    multiqc(outdir)
 
 
 if __name__ == "__main__":
