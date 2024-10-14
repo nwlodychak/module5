@@ -50,14 +50,6 @@ SAMPLE_DIR=${BASE_DIR}/data/ReaganData/Reagan_PE85_TakaraPicoV2_HC_CM_10042022
 find "$SAMPLE_DIR" -type f -name "*.gz" > ${RESULTS}/samplemanifest.txt
 SAMPLE_MANIFEST=${RESULTS}/samplemanifest.txt
 
-
-################################################################################################
-### GENOME BUILD ###
-################################################################################################
-mkdir -p ${GENOME_DIR}
-bowtie2-build --threads ${SLURM_CPUS_PER_TASK} ${REFERENCE_FILE} ${GENOME_DIR}/${INDEX}
-
-
 ################################################################################################
 ### ALIGNMENT PYTHON MODULE ###
 ################################################################################################
