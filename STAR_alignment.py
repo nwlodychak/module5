@@ -114,8 +114,6 @@ def align_reads(genome, sample_id, fq1, fq2, outdir, aligner):
     :param outdir: where do you want the alignment files to go?
     :param aligner: type of aligner to use
     """
-    assert os.path.isfile(genome) and os.path.isfile(fq1) and os.path.isfile(fq2), \
-        f"Genome, fq1 or fq2 does not exist"
 
     try:
         if aligner == "STAR":
